@@ -1,6 +1,5 @@
 /*
 Copyright © 2026 NAME HERE <EMAIL ADDRESS>
-
 */
 package cmd
 
@@ -16,6 +15,7 @@ var validateInput string
 var validateCmd = &cobra.Command{
 	Use:   "validate [file]",
 	Short: "Validate JSON or YAML file",
+	SilenceUsage: true,
 
 	RunE: func(cmd *cobra.Command, args []string) error {
 

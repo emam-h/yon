@@ -1,129 +1,117 @@
 package processor
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
 	"go.yaml.in/yaml/v4"
 )
 
-// Validate checks whether the provided file content is valid JSON or YAML.
-// It validates:
-//
-//   - File extension support
-//   - Syntax correctness
-//   - Root document structure
-//
-// Supported extensions:
-//
-//   - .json
-//   - .yaml
-//   - .yml
 func Validate(file string, data []byte) error {
-	ext := normalizeExt(filepath.Ext(file))
-
 	if len(data) == 0 {
 		return fmt.Errorf("%s: file is empty", file)
 	}
-	var v any
+
+	ext := strings.ToLower(filepath.Ext(file))
+	var content any
+
 	switch ext {
 	case ".json":
-		if err := validateJSON(data, &v); err != nil {
-			return formatJSONError(file, err)
+		if err := parseJSON(data, &content); err != nil {
+			return formatJSONError(file, data, err)
 		}
-
 	case ".yaml", ".yml":
-		if err := validateYAML(data, &v); err != nil {
-			return formatYAMLError(file, err)
+		if err := yaml.Unmarshal(data, &content); err != nil {
+			return fmt.Errorf("%s: invalid YAML: %w", file, err)
 		}
-
 	default:
-		return fmt.Errorf(
-			"%s: unsupported file type %q (supported: .json, .yaml, .yml)",
-			file,
-			ext,
-		)
+		return fmt.Errorf("%s: unsupported file extension %q", file, ext)
 	}
 
-	if err := validateRootStructure(v); err != nil {
+	if err := validateRoot(content); err != nil {
 		return fmt.Errorf("%s: %w", file, err)
 	}
 
 	return nil
 }
 
-func normalizeExt(ext string) string {
-	return strings.ToLower(ext)
-}
-
-func validateJSON(data []byte, v *any) error {
-	dec := json.NewDecoder(strings.NewReader(string(data)))
-
-	// Prevent multiple JSON objects in a single file.
-	// Example invalid:
-	//
-	//   {"a":1} {"b":2}
-	//
-	dec.DisallowUnknownFields()
-
-	if err := dec.Decode(v); err != nil {
+func parseJSON(data []byte, target any) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	if err := decoder.Decode(target); err != nil {
 		return err
 	}
-
-	// Ensure there is no trailing garbage.
-	if dec.More() {
-		return fmt.Errorf("multiple JSON values detected")
+	if decoder.More() {
+		return fmt.Errorf("extra data after top-level JSON value")
 	}
-
 	return nil
 }
 
-func validateYAML(data []byte, v *any) error {
-	dec := yaml.NewDecoder(strings.NewReader(string(data)))
-
-	if err := dec.Decode(v); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func validateRootStructure(v any) error {
-	switch v.(type) {
+func validateRoot(value any) error {
+	switch value.(type) {
 	case map[string]any, []any:
 		return nil
 	default:
-		return fmt.Errorf(
-			"root document must be an object/map or array/list",
-		)
+		return fmt.Errorf("root must be an object or array, got %T", value)
 	}
 }
 
-func formatJSONError(file string, err error) error {
-	switch e := err.(type) {
-
-	case *json.SyntaxError:
+func formatJSONError(file string, data []byte, err error) error {
+	var syntaxErr *json.SyntaxError
+	if errors.As(err, &syntaxErr) {
+		line, col := lineCol(data, syntaxErr.Offset)
+		lineText := getLine(data, line)
+		caret := " " + strings.Repeat(" ", col-1) + "^"
 		return fmt.Errorf(
-			"%s: invalid JSON syntax at byte offset %d",
+			"%s: invalid JSON syntax at line %d, column %d\n%s\n%s\n%w",
 			file,
-			e.Offset,
+			line,
+			col,
+			lineText,
+			caret,
+			syntaxErr,
 		)
-
-	case *json.UnmarshalTypeError:
-		return fmt.Errorf(
-			"%s: invalid JSON type for field %q: expected %v but got %q",
-			file,
-			e.Field,
-			e.Type,
-			e.Value,
-		)
-
-	default:
-		return fmt.Errorf("%s: invalid JSON: %v", file, err)
 	}
+	return fmt.Errorf("%s: invalid JSON: %w", file, err)
 }
 
-func formatYAMLError(file string, err error) error {
-	return fmt.Errorf("%s: invalid YAML: %v", file, err)
+func lineCol(data []byte, offset int64) (line, col int) {
+	if offset < 1 {
+		offset = 1
+	}
+
+	line = 1
+	col = 1
+
+	for i := int64(0); i < offset-1 && i < int64(len(data)); i++ {
+		if data[i] == '\n' {
+			line++
+			col = 1
+		} else {
+			col++
+		}
+	}
+	return
+}
+
+func getLine(data []byte, target int) string {
+	line := 1
+	start := 0
+
+	for i, b := range data {
+		if b == '\n' {
+			if line == target {
+				return string(data[start:i])
+			}
+			line++
+			start = i + 1
+		}
+	}
+
+	if line == target {
+		return string(data[start:])
+	}
+	return ""
 }
