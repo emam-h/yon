@@ -17,14 +17,13 @@ build:
 checksum:
 	cd $(DIST) && shasum -a 256 * > checksums.txt
 
-# 🔥 NEW STEP (IMPORTANT)
 package:
 	@echo "Packaging for Homebrew..."
 	@cd $(DIST) && \
-	tar -czf yon-darwin-arm64.tar.gz yon-darwin-arm64 && \
-	tar -czf yon-darwin-amd64.tar.gz yon-darwin-amd64 && \
-	tar -czf yon-linux-amd64.tar.gz yon-linux-amd64 && \
-	tar -czf yon-linux-arm64.tar.gz yon-linux-arm64
+	cp yon-darwin-arm64 yon && tar -czf yon-darwin-arm64.tar.gz yon && rm yon && \
+	cp yon-darwin-amd64 yon && tar -czf yon-darwin-amd64.tar.gz yon && rm yon && \
+	cp yon-linux-amd64 yon && tar -czf yon-linux-amd64.tar.gz yon && rm yon && \
+	cp yon-linux-arm64 yon && tar -czf yon-linux-arm64.tar.gz yon && rm yon
 
 clean:
 	rm -rf $(DIST)
