@@ -14,13 +14,17 @@ var outputFile string
 
 var rootCmd = &cobra.Command{
 	Use:   "yon",
-	Short: "Convert between YAML and JSON files",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
+	Short: "Convert files between YAML and JSON formats",
+	Long: `Yon is a CLI tool for converting data files between YAML and JSON formats.
+It accepts either positional source and destination file arguments or the
+--input and --output flags. Yon also provides subcommands to validate and
+reformat YAML/JSON content for consistent output.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+Examples:
+  yon input.yaml output.json
+  yon --input=input.json --output=output.yaml
+  yon format file.yaml
+  yon validate file.json`,
 
 	RunE: func(cmd *cobra.Command, args []string) error {
 

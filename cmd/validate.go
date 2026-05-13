@@ -39,7 +39,7 @@ var validateCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Println("valid file")
+		fmt.Println("Valid File")
 		return nil
 	},
 }

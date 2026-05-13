@@ -1,0 +1,6 @@
+{
+  "name": "Test",
+  "value": 123,
+  "missingQuote: true,
+  "items": [1,2,3,],
+}
